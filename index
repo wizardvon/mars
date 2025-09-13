@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MARS — Mental Arithmetic (Addition MVP)</title>
+  <style>
+    :root{--bg:#f8fafc;--fg:#0f172a;--muted:#475569;--card:#ffffff;--ok:#22c55e;--bad:#ef4444;--chip:#e2e8f0;--chipActive:#0ea5e9}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--fg);}
+    .wrap{max-width:720px;margin:0 auto;padding:20px;}
+    .card{background:var(--card);border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 1px 2px rgba(0,0,0,.04);padding:24px}
+    .center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+    .title{font-size:clamp(28px,4vw,40px);font-weight:900;letter-spacing:.5px}
+    .subtitle{color:var(--muted);font-size:14px}
+    .levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+    .chip{padding:8px 12px;border-radius:999px;background:var(--chip);cursor:pointer;border:1px solid #cbd5e1;font-weight:600}
+    .chip[aria-checked="true"]{background:var(--chipActive);color:white;border-color:var(--chipActive)}
+    .start{font-size:clamp(40px,8vw,64px);font-weight:900;cursor:pointer;user-select:none}
+    .start:hover{opacity:.9}
+    .grid{display:grid;grid-template-columns:1fr;gap:16px}
+    .row{display:flex;gap:12px;align-items:center;justify-content:center}
+    .op{font-size:clamp(36px,6vw,64px);font-weight:800;letter-spacing:1px}
+    input[type=number]{font-size:clamp(24px,4.5vw,32px);padding:12px 14px;border-radius:12px;border:1px solid #cbd5e1;width:180px;text-align:center}
+    button{font-size:16px;padding:10px 14px;border-radius:12px;border:1px solid #cbd5e1;background:#f1f5f9;cursor:pointer}
+    button:active{transform:translateY(1px)}
+    .hud{display:flex;gap:12px;justify-content:center;color:var(--muted);font-size:14px}
+    .topbar{display:flex;justify-content:space-between;align-items:center}
+    .flash{animation:flash .25s ease-in-out}
+    @keyframes flash{0%{filter:brightness(100%)}50%{filter:brightness(120%)}100%{filter:brightness(100%)}}
+    .ok{outline:3px solid color-mix(in srgb, var(--ok) 40%, transparent)}
+    .bad{outline:3px solid color-mix(in srgb, var(--bad) 40%, transparent)}
+    .footer{margin-top:16px;text-align:center;color:var(--muted);font-size:12px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="screen-landing" class="card center" role="region" aria-label="Landing">
+      <div class="title">MARS</div>
+      <div class="subtitle">Mental arithmetic — <strong>Addition only</strong> (Levels 1–5)</div>
+      <div class="levels" role="radiogroup" aria-label="Level select">
+        <div class="chip" role="radio" aria-checked="true" data-level="1">Level 1</div>
+        <div class="chip" role="radio" aria-checked="false" data-level="2">Level 2</div>
+        <div class="chip" role="radio" aria-checked="false" data-level="3">Level 3</div>
+        <div class="chip" role="radio" aria-checked="false" data-level="4">Level 4</div>
+        <div class="chip" role="radio" aria-checked="false" data-level="5">Level 5</div>
+      </div>
+      <div id="start" class="start" role="button" tabindex="0" aria-label="Start">Start</div>
+      <div class="subtitle">Tip: choose a level then tap <strong>Start</strong>.</div>
+    </div>
+
+    <div id="screen-quiz" class="card" hidden role="region" aria-label="Quiz">
+      <div class="topbar">
+        <div class="subtitle"><span id="hud-level">Level 1</span></div>
+        <button id="end">End Session</button>
+      </div>
+      <div class="grid">
+        <div class="row">
+          <div id="opA" class="op">0</div>
+          <div class="op">+</div>
+          <div id="opB" class="op">0</div>
+          <div class="op">=</div>
+          <label for="ans" class="visually-hidden">Answer</label>
+          <input id="ans" type="number" inputmode="numeric" autocomplete="off" />
+        </div>
+        <div class="row" style="justify-content:center">
+          <button id="submit">Submit</button>
+          <button id="skip" title="Next question without answering">Skip</button>
+        </div>
+        <div class="hud">
+          <div>Q# <span id="hud-q">0</span></div>
+          <div>Score <span id="hud-score">0</span></div>
+          <div>Streak <span id="hud-streak">0</span></div>
+          <div>Best <span id="hud-best">0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="screen-summary" class="card center" hidden role="region" aria-label="Summary">
+      <div class="title">Session Summary</div>
+      <div class="row" style="gap:20px;flex-wrap:wrap">
+        <div class="card" style="min-width:200px"><strong>Total</strong><div id="sum-total">0</div></div>
+        <div class="card" style="min-width:200px"><strong>Correct</strong><div id="sum-correct">0</div></div>
+        <div class="card" style="min-width:200px"><strong>Accuracy</strong><div id="sum-acc">0%</div></div>
+        <div class="card" style="min-width:200px"><strong>Best Streak</strong><div id="sum-best">0</div></div>
+      </div>
+      <button id="back">Back to Start</button>
+    </div>
+
+    <div class="footer">MARS mental arithmetic – Addition only (MVP)</div>
+  </div>
+
+  <script>
+    // --- Simple state ---
+    const state = {
+      level: 1,
+      q: 0,
+      score: 0,
+      streak: 0,
+      best: 0,
+      a: 0,
+      b: 0
+    };
+
+    // --- DOM ---
+    const landing = document.getElementById('screen-landing');
+    const quiz = document.getElementById('screen-quiz');
+    const summary = document.getElementById('screen-summary');
+
+    const chips = Array.from(document.querySelectorAll('.chip'));
+    const hudLevel = document.getElementById('hud-level');
+    const hudQ = document.getElementById('hud-q');
+    const hudScore = document.getElementById('hud-score');
+    const hudStreak = document.getElementById('hud-streak');
+    const hudBest = document.getElementById('hud-best');
+
+    const opA = document.getElementById('opA');
+    const opB = document.getElementById('opB');
+    const ans = document.getElementById('ans');
+
+    const startBtn = document.getElementById('start');
+    const submitBtn = document.getElementById('submit');
+    const skipBtn = document.getElementById('skip');
+    const endBtn = document.getElementById('end');
+    const backBtn = document.getElementById('back');
+
+    const sumTotal = document.getElementById('sum-total');
+    const sumCorrect = document.getElementById('sum-correct');
+    const sumAcc = document.getElementById('sum-acc');
+    const sumBest = document.getElementById('sum-best');
+
+    // --- Helpers ---
+    function pickLevel(level){
+      state.level = level;
+      chips.forEach(c => c.setAttribute('aria-checked', c.dataset.level == level ? 'true' : 'false'));
+    }
+
+    function rangeByLevel(level){
+      switch(Number(level)){
+        case 1: return [0,9];             // 1-digit
+        case 2: return [10,99];           // up to 2-digit
+        case 3: return [100,999];         // up to 3-digit
+        case 4: return [1000,9999];       // up to 4-digit
+        case 5: return [10000,99999];     // up to 5-digit
+        default: return [0,9];
+      }
+    }
+
+    function randInt(min, max){
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+
+    function newQuestion(){
+      const [lo, hi] = rangeByLevel(state.level);
+      // Level 1 allows 0–9; others avoid leading zeros implicitly via range
+      state.a = randInt(lo, hi);
+      state.b = randInt(lo, hi);
+      state.q++;
+      opA.textContent = state.a;
+      opB.textContent = state.b;
+      hudLevel.textContent = `Level ${state.level}`;
+      hudQ.textContent = state.q;
+      ans.value = '';
+      ans.focus();
+    }
+
+    function applyResult(correct){
+      if(correct){
+        state.score++;
+        state.streak++;
+        state.best = Math.max(state.best, state.streak);
+        flash(opA.parentElement.parentElement, 'ok');
+      }else{
+        state.streak = 0;
+        flash(opA.parentElement.parentElement, 'bad');
+      }
+      hudScore.textContent = state.score;
+      hudStreak.textContent = state.streak;
+      hudBest.textContent = state.best;
+      newQuestion();
+    }
+
+    function flash(el, kind){
+      el.classList.remove('flash','ok','bad');
+      void el.offsetWidth; // restart animation
+      el.classList.add('flash', kind);
+      setTimeout(()=>el.classList.remove('ok','bad'), 250);
+    }
+
+    function startSession(){
+      // Reset state
+      state.q = 0; state.score = 0; state.streak = 0; // keep best per session
+      hudScore.textContent = 0; hudStreak.textContent = 0; hudBest.textContent = state.best;
+      landing.hidden = true; summary.hidden = true; quiz.hidden = false;
+      newQuestion();
+    }
+
+    function endSession(){
+      const total = state.q - 0; // questions shown equals attempts (includes skips)
+      const correct = state.score;
+      const acc = total ? Math.round((correct/total)*100) : 0;
+      sumTotal.textContent = total;
+      sumCorrect.textContent = correct;
+      sumAcc.textContent = acc + '%';
+      sumBest.textContent = state.best;
+      quiz.hidden = true; summary.hidden = false;
+    }
+
+    // --- Events ---
+    chips.forEach(c => c.addEventListener('click', () => pickLevel(Number(c.dataset.level))));
+    startBtn.addEventListener('click', startSession);
+    startBtn.addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ startSession(); }});
+
+    submitBtn.addEventListener('click', () => {
+      const user = Number(ans.value.trim());
+      const correct = (user === (state.a + state.b));
+      applyResult(correct);
+    });
+
+    skipBtn.addEventListener('click', () => applyResult(false));
+    endBtn.addEventListener('click', endSession);
+    backBtn.addEventListener('click', () => { summary.hidden = true; landing.hidden = false; });
+
+    ans.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        submitBtn.click();
+      }
+    });
+
+    // default level 1
+    pickLevel(1);
+  </script>
+</body>
+</html>
