@@ -21,17 +21,21 @@
     .start:hover{opacity:.9}
     .grid{display:grid;grid-template-columns:1fr;gap:16px}
     .row{display:flex;gap:12px;align-items:center;justify-content:center}
-    .op{font-size:clamp(36px,6vw,64px);font-weight:800;letter-spacing:1px}
-    input[type=number]{font-size:clamp(24px,4.5vw,32px);padding:12px 14px;border-radius:12px;border:1px solid #cbd5e1;width:180px;text-align:center}
+    .question-area{display:flex;flex-direction:column;align-items:center;gap:16px}
+    .question{display:flex;align-items:flex-end;justify-content:center;gap:.25em;font-size:clamp(32px,12vw,72px);flex-wrap:nowrap;}
+    .op{font-weight:800;letter-spacing:1px}
+    input[type=number]{font-size:clamp(24px,4.5vw,32px);padding:12px 14px;border-radius:12px;border:1px solid #cbd5e1;width:100%;max-width:240px;text-align:center}
+    input.error{border-color:var(--bad)}
     button{font-size:16px;padding:10px 14px;border-radius:12px;border:1px solid #cbd5e1;background:#f1f5f9;cursor:pointer}
     button:active{transform:translateY(1px)}
-    .hud{display:flex;gap:12px;justify-content:center;color:var(--muted);font-size:14px}
+    .hud{display:flex;gap:12px;justify-content:center;color:var(--muted);font-size:14px;flex-wrap:wrap}
     .topbar{display:flex;justify-content:space-between;align-items:center}
     .flash{animation:flash .25s ease-in-out}
     @keyframes flash{0%{filter:brightness(100%)}50%{filter:brightness(120%)}100%{filter:brightness(100%)}}
     .ok{outline:3px solid color-mix(in srgb, var(--ok) 40%, transparent)}
     .bad{outline:3px solid color-mix(in srgb, var(--bad) 40%, transparent)}
     .footer{margin-top:16px;text-align:center;color:var(--muted);font-size:12px}
+    .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   </style>
 </head>
 <body>
@@ -56,15 +60,18 @@
         <button id="end">End Session</button>
       </div>
       <div class="grid">
-        <div class="row">
-          <div id="opA" class="op">0</div>
-          <div class="op">+</div>
-          <div id="opB" class="op">0</div>
-          <div class="op">=</div>
+        <div id="question-area" class="question-area">
+          <div class="question">
+            <div id="opA" class="op">0</div>
+            <div class="op">+</div>
+            <div id="opB" class="op">0</div>
+            <div class="op">=</div>
+            <div class="op">?</div>
+          </div>
           <label for="ans" class="visually-hidden">Answer</label>
-          <input id="ans" type="number" inputmode="numeric" autocomplete="off" />
+          <input id="ans" type="number" min="0" step="1" inputmode="numeric" pattern="[0-9]*" autocomplete="off" />
         </div>
-        <div class="row" style="justify-content:center">
+        <div class="row" style="justify-content:center;flex-wrap:wrap">
           <button id="submit">Submit</button>
           <button id="skip" title="Next question without answering">Skip</button>
         </div>
@@ -118,6 +125,7 @@
     const opA = document.getElementById('opA');
     const opB = document.getElementById('opB');
     const ans = document.getElementById('ans');
+    const qArea = document.getElementById('question-area');
 
     const startBtn = document.getElementById('start');
     const submitBtn = document.getElementById('submit');
@@ -162,6 +170,7 @@
       hudLevel.textContent = `Level ${state.level}`;
       hudQ.textContent = state.q;
       ans.value = '';
+      ans.classList.remove('error');
       ans.focus();
     }
 
@@ -170,10 +179,10 @@
         state.score++;
         state.streak++;
         state.best = Math.max(state.best, state.streak);
-        flash(opA.parentElement.parentElement, 'ok');
+        flash(qArea, 'ok');
       }else{
         state.streak = 0;
-        flash(opA.parentElement.parentElement, 'bad');
+        flash(qArea, 'bad');
       }
       hudScore.textContent = state.score;
       hudStreak.textContent = state.streak;
@@ -213,7 +222,14 @@
     startBtn.addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ startSession(); }});
 
     submitBtn.addEventListener('click', () => {
-      const user = Number(ans.value.trim());
+      const raw = ans.value.trim();
+      if(raw === ''){
+        ans.classList.add('error');
+        flash(ans, 'bad');
+        ans.focus();
+        return;
+      }
+      const user = Number(raw);
       const correct = (user === (state.a + state.b));
       applyResult(correct);
     });
@@ -228,6 +244,7 @@
         submitBtn.click();
       }
     });
+    ans.addEventListener('input', () => ans.classList.remove('error'));
 
     // default level 1
     pickLevel(1);
